@@ -54,19 +54,8 @@ export class Time {
     date.setDate(Math.min(originalDate, lastDayOfMonth));
   }
 
-  private static addYears(date: Date, amount: number) {
-    const originalDate = date.getDate();
-    const originalMonth = date.getMonth();
-
-    date.setDate(1);
-    date.setFullYear(date.getFullYear() + amount);
-
-    const nextYearDate = new Date(
-      date.getFullYear(),
-      originalMonth + 1,
-      0,
-    ).getDate();
-    date.setDate(Math.min(originalDate, nextYearDate));
+  private static addYears(date: Date, amount: number): void {
+    Time.addMonths(date, amount * 12);
   }
 
   // private formatToken(token: string): string {
