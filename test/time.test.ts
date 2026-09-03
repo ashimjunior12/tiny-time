@@ -107,4 +107,38 @@ describe("Time", () => {
 
     expect(date.add(2, "hours").format("HH:mm:ss")).toBe("16:30:00");
   });
+
+  it("should accept a Date object", () => {
+    const input = new Date(2026, 7, 19, 14, 30, 0);
+
+    const date = time(input);
+
+    expect(date.format("YYYY-MM-DD HH:mm:ss")).toBe("2026-08-19 14:30:00");
+  });
+
+  it("should accept a date string", () => {
+    const date = time("2026-08-19T14:30:00");
+
+    expect(date.format("YYYY-MM-DD HH:mm:ss")).toBe("2026-08-19 14:30:00");
+  });
+
+  it("should reject an invalid date", () => {
+    expect(() => time("invalid-date")).toThrow("Invalid date");
+  });
+
+  it("should create the current date when no value is provided", () => {
+    const date = time();
+
+    expect(date).toBeDefined();
+  });
+
+  it("should clone the provided Date object", () => {
+    const input = new Date(2026, 7, 19, 14, 30, 0);
+
+    const date = time(input);
+
+    input.setFullYear(2030);
+
+    expect(date.format("YYYY-MM-DD")).toBe("2026-08-19");
+  });
 });

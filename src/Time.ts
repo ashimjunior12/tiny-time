@@ -38,12 +38,19 @@ export class Time {
     },
   };
 
-  constructor(value?: string | Date) {
-    this.date =
-      value instanceof Date ? new Date(value.getTime())
-      : value ? new Date(value)
-      : new Date();
+  private static parse(value?: string | Date): Date {
+    if (value === undefined) {
+      return new Date();
+    }
+    if (value instanceof Date) {
+      return new Date(value.getTime());
+    }
+    const date = new Date(value);
+    return date;
+  }
 
+  constructor(value?: string | Date) {
+    this.date = Time.parse(value);
     this.validateDate();
   }
 
