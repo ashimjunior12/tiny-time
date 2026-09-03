@@ -1,5 +1,5 @@
 {
-  "name": "timely",
+  "name": "timeatom",
   "version": "1.0.0",
   "description": "A lightweight date and time library",
   "type": "module",
