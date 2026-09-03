@@ -54,6 +54,13 @@ export class Time {
     this.validateDate();
   }
 
+  private static getDate(value: Time | Date | string): Date {
+    if (value instanceof Time) {
+      return new Date(value.date.getTime());
+    }
+    return Time.parse(value);
+  }
+
   /**
    * Adds months while keeping the day within the target month.
    *
@@ -193,5 +200,17 @@ export class Time {
    */
   to24Hour(): string {
     return this.format("HH:mm");
+  }
+
+  isBefore(other: Time | Date | string): boolean {
+    return this.date.getTime() < Time.getDate(other).getTime();
+  }
+
+  isAfter(other: Time | Date | string): boolean {
+    return this.date.getTime() > Time.getDate(other).getTime();
+  }
+
+  isSame(other: Time | Date | string): boolean {
+    return this.date.getTime() === Time.getDate(other).getTime();
   }
 }

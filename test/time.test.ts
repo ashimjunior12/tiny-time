@@ -141,4 +141,31 @@ describe("Time", () => {
 
     expect(date.format("YYYY-MM-DD")).toBe("2026-08-19");
   });
+
+  it("should determine whether a date is before another date", () => {
+    const date = time("2026-08-19T14:30:00");
+    const other = time("2026-08-20T14:30:00");
+
+    expect(date.isBefore(other)).toBe(true);
+  });
+
+  it("should determine whether a date is after another date", () => {
+    const date = time("2026-08-20T14:30:00");
+    const other = time("2026-08-19T14:30:00");
+
+    expect(date.isAfter(other)).toBe(true);
+  });
+
+  it("should determine whether two dates are the same", () => {
+    const date = time("2026-08-19T14:30:00");
+    const other = time("2026-08-19T14:30:00");
+
+    expect(date.isSame(other)).toBe(true);
+  });
+
+  it("should compare against a date string", () => {
+    const date = time("2026-08-19T14:30:00");
+
+    expect(date.isBefore("2026-08-20T14:30:00")).toBe(true);
+  });
 });
