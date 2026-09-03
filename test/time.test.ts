@@ -64,7 +64,47 @@ describe("Time", () => {
     const date1 = time("2028-01-01");
     const date2 = time("2025-01-01");
 
-    expect(date1.isLeapYear(date1.format())).toBe(true);
-    expect(date2.isLeapYear(date2.format())).toBe(false);
+    expect(date1.isLeapYear()).toBe(true);
+    expect(date2.isLeapYear()).toBe(false);
+  });
+
+  it("should handle proper date format", () => {
+    const date = time("2026-01-02");
+
+    expect(date.format("YYYY/MM/DD")).toBe("2026/01/02");
+  });
+
+  it("should format time in 12-hour format", () => {
+    const date = time("2026-08-19T14:30:00");
+
+    expect(date.format("hh:mm")).toBe("02:30");
+  });
+
+  it("should convert 13:00 to 01:00 pm", () => {
+    const date = time("2026-08-19T13:00:00");
+    expect(date.to12Hour()).toBe("01:00 PM");
+  });
+
+  it("should convert 00:00 to 12:00 am", () => {
+    const date = time("2026-08-19T00:00:00");
+    expect(date.to12Hour()).toBe("12:00 AM");
+  });
+
+  it("should add seconds", () => {
+    const date = time("2026-08-19T14:30:00");
+
+    expect(date.add(30, "seconds").format("HH:mm:ss")).toBe("14:30:30");
+  });
+
+  it("should add minutes", () => {
+    const date = time("2026-08-19T14:30:00");
+
+    expect(date.add(30, "minutes").format("HH:mm:ss")).toBe("15:00:00");
+  });
+
+  it("should add hours", () => {
+    const date = time("2026-08-19T14:30:00");
+
+    expect(date.add(2, "hours").format("HH:mm:ss")).toBe("16:30:00");
   });
 });
