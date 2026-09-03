@@ -13,3 +13,5 @@ export type StartEndUnit =
   | "day"
   | "month"
   | "year";
+
+export type DiffUnit = "seconds" | "minutes" | "hours" | "days";

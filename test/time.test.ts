@@ -210,4 +210,46 @@ describe("Time", () => {
 
     expect(date.endOf("month").format()).toBe("2028-02-29 23:59:59");
   });
+
+  it("should calculate the difference in seconds", () => {
+    const start = time("2026-08-19T10:00:00");
+    const end = time("2026-08-19T10:00:10");
+
+    expect(end.diff(start, "seconds")).toBe(10);
+  });
+
+  it("should calculate the difference in minutes", () => {
+    const start = time("2026-08-19T10:00:00");
+    const end = time("2026-08-19T10:30:00");
+
+    expect(end.diff(start, "minutes")).toBe(30);
+  });
+
+  it("should calculate the difference in hours", () => {
+    const start = time("2026-08-19T10:00:00");
+    const end = time("2026-08-19T14:00:00");
+
+    expect(end.diff(start, "hours")).toBe(4);
+  });
+
+  it("should calculate the difference in days", () => {
+    const start = time("2026-08-19T10:00:00");
+    const end = time("2026-08-21T10:00:00");
+
+    expect(end.diff(start, "days")).toBe(2);
+  });
+
+  it("should return a negative difference when the current date is earlier", () => {
+    const start = time("2026-08-19T10:00:00");
+    const end = time("2026-08-19T12:00:00");
+
+    expect(start.diff(end, "hours")).toBe(-2);
+  });
+
+  it("should return fractional differences", () => {
+    const start = time("2026-08-19T10:00:00");
+    const end = time("2026-08-19T10:30:00");
+
+    expect(end.diff(start, "hours")).toBe(0.5);
+  });
 });

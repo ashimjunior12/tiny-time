@@ -1,4 +1,4 @@
-import type { TimeUnit, StartEndUnit } from "./types.js";
+import type { TimeUnit, StartEndUnit, DiffUnit } from "./types.js";
 export class Time {
   private readonly date: Date;
 
@@ -271,5 +271,19 @@ export class Time {
         break;
     }
     return new Time(newDate);
+  }
+
+  // find the diff in milliseconds between dates then divide with the respective millisseconds
+  diff(other: Time | Date | string, unit: DiffUnit): number {
+    const diff = this.date.getTime() - Time.getDate(other).getTime();
+
+    const millisecondsPerUnit: Record<DiffUnit, number> = {
+      seconds: 1000,
+      minutes: 1000 * 60,
+      hours: 1000 * 60 * 60,
+      days: 1000 * 24 * 60 * 60,
+    };
+
+    return diff / millisecondsPerUnit[unit];
   }
 }
