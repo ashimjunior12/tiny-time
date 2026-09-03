@@ -1,11 +1,4 @@
-export type TimeUnit =
-  | "seconds"
-  | "minutes"
-  | "hours"
-  | "days"
-  | "months"
-  | "years";
-
+import type { TimeUnit, StartEndUnit } from "./types.js";
 export class Time {
   private readonly date: Date;
 
@@ -212,5 +205,71 @@ export class Time {
 
   isSame(other: Time | Date | string): boolean {
     return this.date.getTime() === Time.getDate(other).getTime();
+  }
+
+  startOf(unit: StartEndUnit): Time {
+    const newDate = new Date(this.date.getTime());
+
+    switch (unit) {
+      case "second":
+        newDate.setMilliseconds(0);
+        break;
+
+      case "minute":
+        newDate.setSeconds(0, 0);
+        break;
+
+      case "hour":
+        newDate.setMinutes(0, 0, 0);
+        break;
+
+      case "day":
+        newDate.setHours(0, 0, 0, 0);
+        break;
+
+      case "month":
+        newDate.setDate(1);
+        newDate.setHours(0, 0, 0, 0);
+        break;
+
+      case "year":
+        newDate.setMonth(0, 1);
+        newDate.setHours(0, 0, 0, 0);
+        break;
+    }
+    return new Time(newDate);
+  }
+
+  endOf(unit: StartEndUnit): Time {
+    const newDate = new Date(this.date.getTime());
+
+    switch (unit) {
+      case "second":
+        newDate.setMilliseconds(999);
+        break;
+
+      case "minute":
+        newDate.setSeconds(59, 999);
+        break;
+
+      case "hour":
+        newDate.setMinutes(59, 59, 999);
+        break;
+
+      case "day":
+        newDate.setHours(23, 59, 59, 999);
+        break;
+
+      case "month":
+        newDate.setMonth(newDate.getMonth() + 1, 0);
+        newDate.setHours(23, 59, 59, 999);
+        break;
+
+      case "year":
+        newDate.setFullYear(newDate.getFullYear() + 1, 0, 0);
+        newDate.setHours(23, 59, 59, 999);
+        break;
+    }
+    return new Time(newDate);
   }
 }

@@ -168,4 +168,46 @@ describe("Time", () => {
 
     expect(date.isBefore("2026-08-20T14:30:00")).toBe(true);
   });
+
+  it("should get the start of a day", () => {
+    const date = time("2026-08-19T14:35:42");
+
+    expect(date.startOf("day").format()).toBe("2026-08-19 00:00:00");
+  });
+
+  it("should get the start of a month", () => {
+    const date = time("2026-08-19T14:35:42");
+
+    expect(date.startOf("month").format()).toBe("2026-08-01 00:00:00");
+  });
+
+  it("should get the start of a year", () => {
+    const date = time("2026-08-19T14:35:42");
+
+    expect(date.startOf("year").format()).toBe("2026-01-01 00:00:00");
+  });
+
+  it("should get the end of a day", () => {
+    const date = time("2026-08-19T14:35:42");
+
+    expect(date.endOf("day").format()).toBe("2026-08-19 23:59:59");
+  });
+
+  it("should get the end of a month", () => {
+    const date = time("2026-08-19T14:35:42");
+
+    expect(date.endOf("month").format()).toBe("2026-08-31 23:59:59");
+  });
+
+  it("should get the end of a year", () => {
+    const date = time("2026-08-19T14:35:42");
+
+    expect(date.endOf("year").format()).toBe("2026-12-31 23:59:59");
+  });
+
+  it("should handle the end of February in a leap year", () => {
+    const date = time("2028-02-15T14:35:42");
+
+    expect(date.endOf("month").format()).toBe("2028-02-29 23:59:59");
+  });
 });
