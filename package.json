@@ -1,13 +1,78 @@
 {
   "name": "timeatom",
-  "version": "1.0.1",
-  "description": "A lightweight date and time library",
+  "version": "1.3.1",
+  "description": "TimeAtom is a tiny (~4kB gzipped), immutable, dependency-free date and time library for JavaScript and TypeScript — format, custom-format parsing, add/subtract, compare, relative time (\"3 days ago\"), calendar phrases, week & quarter numbers, ranges, clamp, round, and precise diffs. Everything Day.js needs a dozen plugins for, built in. A lightweight modern alternative to Moment.js and Day.js.",
+  "keywords": [
+    "date",
+    "time",
+    "datetime",
+    "timestamp",
+    "year",
+    "month",
+    "months",
+    "day",
+    "days",
+    "week",
+    "hour",
+    "minute",
+    "second",
+    "date-format",
+    "format",
+    "parse",
+    "diff",
+    "duration",
+    "relative-time",
+    "timeago",
+    "fromnow",
+    "calendar",
+    "parse",
+    "date-parser",
+    "quarter",
+    "iso-week",
+    "range",
+    "leap-year",
+    "immutable",
+    "chainable",
+    "lightweight",
+    "tiny",
+    "zero-dependency",
+    "dependency-free",
+    "dayjs",
+    "moment",
+    "momentjs",
+    "date-fns",
+    "luxon",
+    "typescript",
+    "javascript"
+  ],
   "type": "module",
   "main": "dist/index.js",
+  "module": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "sideEffects": false,
   "files": [
     "dist"
   ],
+  "engines": {
+    "node": ">=16"
+  },
+  "author": "ashimjunior12 <ashimjunior12@gmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/ashimjunior12/tiny-time#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ashimjunior12/tiny-time.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ashimjunior12/tiny-time/issues"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
