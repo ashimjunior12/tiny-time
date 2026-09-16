@@ -1,289 +1,560 @@
-import type { TimeUnit, StartEndUnit, DiffUnit } from "./types.js";
+import type {
+  TimeUnit,
+  StartEndUnit,
+  DiffUnit,
+  SetUnit,
+  GetUnit,
+  TimeInput,
+  TimeObject,
+} from "./types.js";
+import {
+  MONTH_NAMES,
+  MONTH_NAMES_SHORT,
+  DAY_NAMES,
+  DAY_NAMES_SHORT,
+} from "./constants.js";
+import { parse } from "./core/parse.js";
+import { formatDate } from "./core/format.js";
+import { applyUnit } from "./core/manipulate.js";
+import { startOf, endOf } from "./core/boundary.js";
+import { diff } from "./core/diff.js";
+import { relativeTime } from "./core/relative.js";
+import { isoWeek, quarterOf } from "./core/week.js";
+import { calendar } from "./core/calendar.js";
+import { parseFormat } from "./core/parseFormat.js";
+import { preciseDiff, type PreciseDiff } from "./core/preciseDiff.js";
+
+/** Maps a `startOf`/`endOf` unit to the plural unit used by `add`. */
+const STEP_UNIT: Record<StartEndUnit, TimeUnit> = {
+  second: "seconds",
+  minute: "minutes",
+  hour: "hours",
+  day: "days",
+  week: "weeks",
+  month: "months",
+  quarter: "quarters",
+  year: "years",
+};
+
+/**
+ * An immutable wrapper around the native `Date`.
+ *
+ * Every method that would change the value returns a brand new `Time`; the
+ * original is never mutated.
+ */
 export class Time {
-  private readonly date: Date;
+  private readonly instant: Date;
 
-  private static readonly unitMap: Record<
-    TimeUnit,
-    (date: Date, amount: number) => void
-  > = {
-    seconds: (date, amount) => {
-      date.setSeconds(date.getSeconds() + amount);
-    },
-
-    minutes: (date, amount) => {
-      date.setMinutes(date.getMinutes() + amount);
-    },
-
-    hours: (date, amount) => {
-      date.setHours(date.getHours() + amount);
-    },
-
-    days: (date, amount) => {
-      date.setDate(date.getDate() + amount);
-    },
-
-    months: (date, amount) => {
-      Time.addMonths(date, amount);
-    },
-
-    years: (date, amount) => {
-      Time.addYears(date, amount);
-    },
-  };
-
-  private static parse(value?: string | Date): Date {
-    if (value === undefined) {
-      return new Date();
+  constructor(value?: TimeInput, format?: string) {
+    if (typeof value === "string" && format !== undefined) {
+      this.instant = parseFormat(value, format);
+    } else {
+      this.instant = Time.toDateValue(value);
     }
-    if (value instanceof Date) {
-      return new Date(value.getTime());
-    }
-    const date = new Date(value);
-    return date;
-  }
 
-  constructor(value?: string | Date) {
-    this.date = Time.parse(value);
-    this.validateDate();
-  }
-
-  private static getDate(value: Time | Date | string): Date {
-    if (value instanceof Time) {
-      return new Date(value.date.getTime());
-    }
-    return Time.parse(value);
-  }
-
-  /**
-   * Adds months while keeping the day within the target month.
-   *
-   * Example:
-   * 2026-01-31 + 1 month → 2026-02-28
-   */
-  private static addMonths(date: Date, amount: number): void {
-    const originalDay = date.getDate();
-
-    // Prevent JavaScript Date from overflowing
-    // when the current day doesn't exist in the target month.
-    date.setDate(1);
-
-    date.setMonth(date.getMonth() + amount);
-
-    const lastDayOfTargetMonth = new Date(
-      date.getFullYear(),
-      date.getMonth() + 1,
-      0,
-    ).getDate();
-
-    date.setDate(Math.min(originalDay, lastDayOfTargetMonth));
-  }
-
-  /**
-   * Adds years while correctly handling leap days.
-   *
-   * Example:
-   * 2028-02-29 + 1 year → 2029-02-28
-   */
-  private static addYears(date: Date, amount: number): void {
-    Time.addMonths(date, amount * 12);
-  }
-
-  private static pad(value: number): string {
-    return String(value).padStart(2, "0");
-  }
-
-  private validateDate(): void {
-    if (Number.isNaN(this.date.getTime())) {
+    if (Number.isNaN(this.instant.getTime())) {
       throw new Error("Invalid date");
     }
   }
 
-  /**
-   * Formats the current date/time.
-   *
-   * Supported tokens:
-   *
-   * YYYY → 2026
-   * YY   → 26
-   * MM   → 08
-   * DD   → 19
-   * HH   → 14
-   * hh   → 02
-   * mm   → 30
-   * ss   → 45
-   * A    → PM
-   * a    → pm
-   */
-  format(pattern = "YYYY-MM-DD HH:mm:ss"): string {
-    const hours = this.date.getHours();
+  /** Normalizes any accepted input (including another `Time`) into a `Date`. */
+  private static toDateValue(value?: TimeInput): Date {
+    if (value instanceof Time) {
+      return new Date(value.instant.getTime());
+    }
+    return parse(value);
+  }
 
-    const hour12 = hours % 12 || 12;
+  // ---------------------------------------------------------------------------
+  // Static helpers
+  // ---------------------------------------------------------------------------
 
-    const period = hours < 12 ? "AM" : "PM";
+  /** Current date and time. Equivalent to `time()`. */
+  static now(): Time {
+    return new Time();
+  }
 
-    const tokens: Record<string, string> = {
-      YYYY: String(this.date.getFullYear()),
-      YY: String(this.date.getFullYear()).slice(-2),
+  /** Creates a `Time` from a Unix timestamp in **seconds**. */
+  static unix(seconds: number): Time {
+    return new Time(seconds * 1000);
+  }
 
-      MM: Time.pad(this.date.getMonth() + 1),
-      DD: Time.pad(this.date.getDate()),
+  /** Parses a string against an explicit format, e.g. `("19/08/2026", "DD/MM/YYYY")`. */
+  static fromFormat(input: string, format: string): Time {
+    return new Time(input, format);
+  }
 
-      HH: Time.pad(hours),
-      hh: Time.pad(hour12),
+  /** Type guard: whether `value` is a `Time` instance. */
+  static isTime(value: unknown): value is Time {
+    return value instanceof Time;
+  }
 
-      mm: Time.pad(this.date.getMinutes()),
-      ss: Time.pad(this.date.getSeconds()),
+  /** Returns true if the input can be parsed into a valid date, without throwing. */
+  static isValid(value?: TimeInput): boolean {
+    try {
+      return !Number.isNaN(Time.toDateValue(value).getTime());
+    } catch {
+      return false;
+    }
+  }
 
-      A: period,
-      a: period.toLowerCase(),
+  /** The earliest of the given instances. */
+  static min(...times: TimeInput[]): Time {
+    return times
+      .map((t) => new Time(t))
+      .reduce((earliest, current) =>
+        current.isBefore(earliest) ? current : earliest,
+      );
+  }
+
+  /** The latest of the given instances. */
+  static max(...times: TimeInput[]): Time {
+    return times
+      .map((t) => new Time(t))
+      .reduce((latest, current) =>
+        current.isAfter(latest) ? current : latest,
+      );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Conversion
+  // ---------------------------------------------------------------------------
+
+  /** A copy of this instance. */
+  clone(): Time {
+    return new Time(this.instant);
+  }
+
+  /** A native `Date` clone (safe to mutate). */
+  toDate(): Date {
+    return new Date(this.instant.getTime());
+  }
+
+  /** Milliseconds since the Unix epoch. Also enables `<`, `>`, and `Number()`. */
+  valueOf(): number {
+    return this.instant.getTime();
+  }
+
+  /** Seconds since the Unix epoch. */
+  unix(): number {
+    return Math.floor(this.instant.getTime() / 1000);
+  }
+
+  /** ISO 8601 string, e.g. "2026-08-19T14:30:00.000Z". */
+  toISOString(): string {
+    return this.instant.toISOString();
+  }
+
+  /** Default formatted string; used by template literals and `String()`. */
+  toString(): string {
+    return this.format();
+  }
+
+  /** Serializes to an ISO string when passed to `JSON.stringify`. */
+  toJSON(): string {
+    return this.instant.toISOString();
+  }
+
+  /** Plain object of the date's components (month is 1-12). */
+  toObject(): TimeObject {
+    return {
+      year: this.year(),
+      month: this.month(),
+      date: this.date(),
+      hour: this.hour(),
+      minute: this.minute(),
+      second: this.second(),
+      millisecond: this.millisecond(),
     };
+  }
 
-    const tokenRegex = new RegExp(
-      Object.keys(tokens)
-        .sort((a, b) => b.length - a.length)
-        .join("|"),
-      "g",
+  /** Components as `[year, month, date, hour, minute, second, millisecond]` (month 1-12). */
+  toArray(): [number, number, number, number, number, number, number] {
+    return [
+      this.year(),
+      this.month(),
+      this.date(),
+      this.hour(),
+      this.minute(),
+      this.second(),
+      this.millisecond(),
+    ];
+  }
+
+  // ---------------------------------------------------------------------------
+  // Getters
+  // ---------------------------------------------------------------------------
+
+  /** Full year, e.g. 2026. */
+  year(): number {
+    return this.instant.getFullYear();
+  }
+
+  /** Month of the year, 1 (January) through 12 (December). */
+  month(): number {
+    return this.instant.getMonth() + 1;
+  }
+
+  /** Day of the month, 1 through 31. */
+  date(): number {
+    return this.instant.getDate();
+  }
+
+  /** Day of the week, 0 (Sunday) through 6 (Saturday). */
+  day(): number {
+    return this.instant.getDay();
+  }
+
+  hour(): number {
+    return this.instant.getHours();
+  }
+
+  minute(): number {
+    return this.instant.getMinutes();
+  }
+
+  second(): number {
+    return this.instant.getSeconds();
+  }
+
+  millisecond(): number {
+    return this.instant.getMilliseconds();
+  }
+
+  /** Day of the year, 1 through 366. */
+  dayOfYear(): number {
+    const startOfYear = new Date(this.instant.getFullYear(), 0, 1);
+    const startOfDay = new Date(
+      this.instant.getFullYear(),
+      this.instant.getMonth(),
+      this.instant.getDate(),
     );
-
-    return pattern.replace(tokenRegex, (token) => tokens[token]);
+    // Round rather than floor so a 23h/25h daylight-saving day doesn't skew it.
+    return Math.round((startOfDay.getTime() - startOfYear.getTime()) / 86_400_000) + 1;
   }
 
-  /**
-   * Adds an amount of time/date units.
-   */
+  /** Number of days in this instance's month (28-31). */
+  daysInMonth(): number {
+    return new Date(this.instant.getFullYear(), this.instant.getMonth() + 1, 0).getDate();
+  }
+
+  /** Number of days in this instance's year (365 or 366). */
+  daysInYear(): number {
+    return this.isLeapYear() ? 366 : 365;
+  }
+
+  /** Quarter of the year, 1 through 4. */
+  quarter(): number {
+    return quarterOf(this.instant);
+  }
+
+  /** ISO 8601 week number, 1 through 53. */
+  week(): number {
+    return isoWeek(this.instant);
+  }
+
+  /** Timezone offset from UTC in minutes (positive east of UTC). */
+  utcOffset(): number {
+    return -this.instant.getTimezoneOffset();
+  }
+
+  /** Weekday name, e.g. "Monday" (or "Mon" when `short` is true). */
+  dayName(short = false): string {
+    const names = short ? DAY_NAMES_SHORT : DAY_NAMES;
+    return names[this.instant.getDay()];
+  }
+
+  /** Month name, e.g. "August" (or "Aug" when `short` is true). */
+  monthName(short = false): string {
+    const names = short ? MONTH_NAMES_SHORT : MONTH_NAMES;
+    return names[this.instant.getMonth()];
+  }
+
+  /** ISO weekday, 1 (Monday) through 7 (Sunday). */
+  isoWeekday(): number {
+    const day = this.instant.getDay();
+    return day === 0 ? 7 : day;
+  }
+
+  /** Generic getter — reads any component by name (month is 1-12). */
+  get(unit: GetUnit): number {
+    switch (unit) {
+      case "year": return this.year();
+      case "month": return this.month();
+      case "date": return this.date();
+      case "day": return this.day();
+      case "hour": return this.hour();
+      case "minute": return this.minute();
+      case "second": return this.second();
+      case "millisecond": return this.millisecond();
+      case "quarter": return this.quarter();
+      case "week": return this.week();
+      case "isoWeekday": return this.isoWeekday();
+      case "dayOfYear": return this.dayOfYear();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Manipulation
+  // ---------------------------------------------------------------------------
+
+  /** Returns a new instance with `amount` of `unit` added. */
   add(amount: number, unit: TimeUnit): Time {
-    const newDate = new Date(this.date.getTime());
-
-    Time.unitMap[unit](newDate, amount);
-
-    return new Time(newDate);
+    const next = new Date(this.instant.getTime());
+    applyUnit(next, amount, unit);
+    return new Time(next);
   }
 
-  /**
-   * Subtracts an amount of time/date units.
-   */
+  /** Returns a new instance with `amount` of `unit` subtracted. */
   subtract(amount: number, unit: TimeUnit): Time {
     return this.add(-amount, unit);
   }
 
-  /**
-   * Checks whether the current year is a leap year.
-   */
-  isLeapYear(): boolean {
-    const year = this.date.getFullYear();
+  /** Returns a new instance with a single component overwritten. Month is 1-12. */
+  set(unit: SetUnit, value: number): Time {
+    const next = new Date(this.instant.getTime());
 
-    return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+    switch (unit) {
+      case "year":
+        next.setFullYear(value);
+        break;
+      case "month":
+        next.setMonth(value - 1);
+        break;
+      case "date":
+        next.setDate(value);
+        break;
+      case "hour":
+        next.setHours(value);
+        break;
+      case "minute":
+        next.setMinutes(value);
+        break;
+      case "second":
+        next.setSeconds(value);
+        break;
+      case "millisecond":
+        next.setMilliseconds(value);
+        break;
+    }
+
+    return new Time(next);
+  }
+
+  /** Returns a new instance snapped to the start of `unit`. */
+  startOf(unit: StartEndUnit): Time {
+    return new Time(startOf(this.instant, unit));
+  }
+
+  /** Returns a new instance snapped to the end of `unit`. */
+  endOf(unit: StartEndUnit): Time {
+    return new Time(endOf(this.instant, unit));
+  }
+
+  /** Rounds to the nearest `unit` boundary (ties round up). */
+  round(unit: StartEndUnit): Time {
+    const down = this.startOf(unit);
+    const up = down.add(1, STEP_UNIT[unit]);
+    const midpoint = (down.valueOf() + up.valueOf()) / 2;
+    return this.valueOf() >= midpoint ? up : down;
+  }
+
+  /** Constrains this instance to the inclusive `[min, max]` range. */
+  clamp(min: TimeInput, max: TimeInput): Time {
+    const low = new Time(min);
+    const high = new Time(max);
+    if (this.isBefore(low)) return low.clone();
+    if (this.isAfter(high)) return high.clone();
+    return this.clone();
   }
 
   /**
-   * Returns the current time in 12-hour format.
+   * Builds an array of instances stepping from this instance to `end`
+   * (inclusive). Direction is inferred, so `end` may be earlier or later.
    *
-   * Example:
-   * 14:30 → "02:30 PM"
+   * @param unit step unit (default `"days"`)
+   * @param step step size (default `1`)
    */
+  range(end: TimeInput, unit: TimeUnit = "days", step = 1): Time[] {
+    const target = new Time(end);
+    const ascending = target.isSameOrAfter(this);
+    const magnitude = Math.abs(step) || 1;
+    const stride = ascending ? magnitude : -magnitude;
+
+    const result: Time[] = [];
+    let cursor: Time = this.clone();
+
+    // Hard cap guards against a pathological step producing a runaway loop.
+    for (let guard = 0; guard < 1_000_000; guard += 1) {
+      const done = ascending
+        ? cursor.isAfter(target)
+        : cursor.isBefore(target);
+      if (done) break;
+      result.push(cursor);
+      cursor = cursor.add(stride, unit);
+    }
+
+    return result;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Formatting
+  // ---------------------------------------------------------------------------
+
+  /** Formats using the token table (see `core/format`). */
+  format(pattern = "YYYY-MM-DD HH:mm:ss"): string {
+    return formatDate(this.instant, pattern);
+  }
+
+  /** 12-hour clock string, e.g. "02:30 PM". */
   to12Hour(): string {
     return this.format("hh:mm A");
   }
 
-  /**
-   * Returns the current time in 24-hour format.
-   *
-   * Example:
-   * 14:30 → "14:30"
-   */
+  /** 24-hour clock string, e.g. "14:30". */
   to24Hour(): string {
     return this.format("HH:mm");
   }
 
-  isBefore(other: Time | Date | string): boolean {
-    return this.date.getTime() < Time.getDate(other).getTime();
+  /** Human-readable distance from now, e.g. "2 hours ago" or "in 3 days". */
+  fromNow(withoutSuffix = false): string {
+    return relativeTime(this.instant, new Date(), withoutSuffix);
   }
 
-  isAfter(other: Time | Date | string): boolean {
-    return this.date.getTime() > Time.getDate(other).getTime();
+  /** Human-readable distance from another date. */
+  from(other: TimeInput, withoutSuffix = false): string {
+    return relativeTime(this.instant, Time.toDateValue(other), withoutSuffix);
   }
 
-  isSame(other: Time | Date | string): boolean {
-    return this.date.getTime() === Time.getDate(other).getTime();
+  /**
+   * Friendly calendar phrase relative to `reference` (defaults to now), e.g.
+   * "Today at 2:30 PM", "Yesterday at 9:00 AM", or "08/19/2026".
+   */
+  calendar(reference?: TimeInput): string {
+    const base = reference === undefined ? new Date() : Time.toDateValue(reference);
+    return calendar(this.instant, base);
   }
 
-  startOf(unit: StartEndUnit): Time {
-    const newDate = new Date(this.date.getTime());
+  /** Relative time of `other` as seen from this instance (inverse of `from`). */
+  to(other: TimeInput, withoutSuffix = false): string {
+    return relativeTime(Time.toDateValue(other), this.instant, withoutSuffix);
+  }
 
-    switch (unit) {
-      case "second":
-        newDate.setMilliseconds(0);
-        break;
+  /** Relative time of now as seen from this instance (inverse of `fromNow`). */
+  toNow(withoutSuffix = false): string {
+    return relativeTime(new Date(), this.instant, withoutSuffix);
+  }
 
-      case "minute":
-        newDate.setSeconds(0, 0);
-        break;
+  // ---------------------------------------------------------------------------
+  // Comparison & queries
+  // ---------------------------------------------------------------------------
 
-      case "hour":
-        newDate.setMinutes(0, 0, 0);
-        break;
+  /** True if this instance's year is a leap year. */
+  isLeapYear(): boolean {
+    const year = this.instant.getFullYear();
+    return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  }
 
-      case "day":
-        newDate.setHours(0, 0, 0, 0);
-        break;
+  isBefore(other: TimeInput): boolean {
+    return this.instant.getTime() < Time.toDateValue(other).getTime();
+  }
 
-      case "month":
-        newDate.setDate(1);
-        newDate.setHours(0, 0, 0, 0);
-        break;
+  isAfter(other: TimeInput): boolean {
+    return this.instant.getTime() > Time.toDateValue(other).getTime();
+  }
 
-      case "year":
-        newDate.setMonth(0, 1);
-        newDate.setHours(0, 0, 0, 0);
-        break;
+  /**
+   * Equality check. With no `unit`, compares the exact millisecond timestamps;
+   * with a `unit`, compares only down to that granularity (e.g. same day).
+   */
+  isSame(other: TimeInput, unit?: StartEndUnit): boolean {
+    const otherDate = Time.toDateValue(other);
+
+    if (!unit) {
+      return this.instant.getTime() === otherDate.getTime();
     }
-    return new Time(newDate);
+
+    return (
+      startOf(this.instant, unit).getTime() === startOf(otherDate, unit).getTime()
+    );
   }
 
-  endOf(unit: StartEndUnit): Time {
-    const newDate = new Date(this.date.getTime());
-
-    switch (unit) {
-      case "second":
-        newDate.setMilliseconds(999);
-        break;
-
-      case "minute":
-        newDate.setSeconds(59, 999);
-        break;
-
-      case "hour":
-        newDate.setMinutes(59, 59, 999);
-        break;
-
-      case "day":
-        newDate.setHours(23, 59, 59, 999);
-        break;
-
-      case "month":
-        newDate.setMonth(newDate.getMonth() + 1, 0);
-        newDate.setHours(23, 59, 59, 999);
-        break;
-
-      case "year":
-        newDate.setFullYear(newDate.getFullYear() + 1, 0, 0);
-        newDate.setHours(23, 59, 59, 999);
-        break;
-    }
-    return new Time(newDate);
+  isSameOrBefore(other: TimeInput): boolean {
+    return this.instant.getTime() <= Time.toDateValue(other).getTime();
   }
 
-  // find the diff in milliseconds between dates then divide with the respective millisseconds
-  diff(other: Time | Date | string, unit: DiffUnit): number {
-    const diff = this.date.getTime() - Time.getDate(other).getTime();
+  isSameOrAfter(other: TimeInput): boolean {
+    return this.instant.getTime() >= Time.toDateValue(other).getTime();
+  }
 
-    const millisecondsPerUnit: Record<DiffUnit, number> = {
-      seconds: 1000,
-      minutes: 1000 * 60,
-      hours: 1000 * 60 * 60,
-      days: 1000 * 24 * 60 * 60,
-    };
+  /**
+   * True if this instance lies between `start` and `end`.
+   *
+   * @param inclusivity two characters controlling the bounds: `[` / `]` include
+   *   the edge, `(` / `)` exclude it. Defaults to `"()"` (both exclusive).
+   */
+  isBetween(start: TimeInput, end: TimeInput, inclusivity = "()"): boolean {
+    const value = this.instant.getTime();
+    const startMs = Time.toDateValue(start).getTime();
+    const endMs = Time.toDateValue(end).getTime();
 
-    return diff / millisecondsPerUnit[unit];
+    const lowerOk = inclusivity[0] === "[" ? value >= startMs : value > startMs;
+    const upperOk = inclusivity[1] === "]" ? value <= endMs : value < endMs;
+
+    return lowerOk && upperOk;
+  }
+
+  /** True if this instance falls on the same calendar day as now. */
+  isToday(): boolean {
+    return this.isSame(new Time(), "day");
+  }
+
+  /** True if this instance falls on tomorrow's calendar day. */
+  isTomorrow(): boolean {
+    return this.isSame(new Time().add(1, "days"), "day");
+  }
+
+  /** True if this instance falls on yesterday's calendar day. */
+  isYesterday(): boolean {
+    return this.isSame(new Time().subtract(1, "days"), "day");
+  }
+
+  /** True if this instance falls on a Saturday or Sunday. */
+  isWeekend(): boolean {
+    const weekday = this.instant.getDay();
+    return weekday === 0 || weekday === 6;
+  }
+
+  /** True if this instance falls on a weekday (Monday-Friday). */
+  isWeekday(): boolean {
+    return !this.isWeekend();
+  }
+
+  /** True if this instance is earlier than the current moment. */
+  isPast(): boolean {
+    return this.instant.getTime() < Date.now();
+  }
+
+  /** True if this instance is later than the current moment. */
+  isFuture(): boolean {
+    return this.instant.getTime() > Date.now();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Difference
+  // ---------------------------------------------------------------------------
+
+  /** Difference between this instance and `other`, expressed in `unit`. */
+  diff(other: TimeInput, unit: DiffUnit): number {
+    return diff(this.instant, Time.toDateValue(other), unit);
+  }
+
+  /**
+   * Calendar-accurate breakdown of the span to `other` as
+   * `{ years, months, days, hours, minutes, seconds }` — always non-negative,
+   * with real month lengths (never "32 days"). Handy for "1 year, 2 months ago".
+   */
+  preciseDiff(other: TimeInput): PreciseDiff {
+    return preciseDiff(this.instant, Time.toDateValue(other));
   }
 }
